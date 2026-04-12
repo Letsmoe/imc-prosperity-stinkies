@@ -7,7 +7,7 @@ from pathlib import Path
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-DATA_DIR = Path(".")          # change if your CSVs live elsewhere
+DATA_DIR = Path("data")
 OUT_FILE = Path("market_data.png")
 
 PRICE_FILES = {

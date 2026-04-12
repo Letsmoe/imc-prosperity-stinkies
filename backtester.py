@@ -13,7 +13,7 @@ from datamodel import Order, OrderDepth, Trade, TradingState, Observation, Listi
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-DATA_DIR      = Path(".")
+DATA_DIR      = Path("data")
 OUT_FILE      = Path("backtest.png")
 TRADER_MODULE = "ella"          # your trader filename without .py
 
