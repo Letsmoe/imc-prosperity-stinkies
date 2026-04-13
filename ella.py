@@ -1,5 +1,8 @@
 from datamodel import OrderDepth, TradingState, Order
 from typing import List
+import json
+
+LIMIT = 80
 
 class Trader:
 
@@ -45,40 +48,55 @@ class Trader:
     #     return result, conversions, traderData
 
     def run(self, state: TradingState):
-        result = {}
+        result: Dict[str, List[Order]] = {}
 
         for product in state.order_depths:
             order_depth: OrderDepth = state.order_depths[product]
             orders: List[Order] = []
             pos = state.position.get(product, 0)
+            best_ask = min(order_depth.sell_orders.keys()) if order_depth.sell_orders else None
+            best_bid = max(order_depth.buy_orders.keys()) if order_depth.buy_orders else None
+            buy_qty  = LIMIT - pos
+            sell_qty = LIMIT + pos
+
 
             if product == "EMERALDS":
                 fair  = 10000
-                limit = 80
 
                 # buy at 10k when possible
-                if order_depth.sell_orders:
-                    best_ask = min(order_depth.sell_orders.keys())
-                    if best_ask <= fair:
-                        qty = min(-order_depth.sell_orders[best_ask], limit - pos)
-                        if qty > 0:
-                            orders.append(Order(product, best_ask, qty))
+                if best_ask and best_ask <= fair:
+                    qty = min(-order_depth.sell_orders[best_ask], buy_qty)
+                    if qty > 0:
+                        orders.append(Order(product, best_ask, qty))
+                        buy_qty -= qty
 
-                if order_depth.buy_orders:
-                    best_bid = max(order_depth.buy_orders.keys())
-                    if best_bid >= fair:
-                        qty = min(order_depth.buy_orders[best_bid], limit + pos)
-                        if qty > 0:
-                            orders.append(Order(product, best_bid, -qty))
-
-                # spread at 9993/10007
-                buy_qty  = limit - pos
-                sell_qty = limit + pos
+                if best_bid and best_bid >= fair:
+                    qty = min(order_depth.buy_orders[best_bid], sell_qty)
+                    if qty > 0:
+                        orders.append(Order(product, best_bid, -qty))
+                        sell_qty -= qty
 
                 if buy_qty > 0:
                     orders.append(Order(product, fair - 7, buy_qty))
                 if sell_qty > 0:
                     orders.append(Order(product, fair + 7, -sell_qty))
+
+            else:
+                obs = state.observations.conversionObservations.get("TOMATOES")
+                print(obs)
+                # history = price_history.get(product, [])
+                # history.append((best_bid + best_ask) / 2)
+                # price_history[product] = history[-50:]
+
+                # fair = (sum(history) / len(history))//1
+                # print(fair, best_ask)
+
+                # if best_ask and best_ask <= fair and buy_qty > 0:
+                #     orders.append(Order(product, best_ask, min(-best_ask, buy_qty)))
+
+                # if best_bid and best_bid > fair and sell_qty > 0:
+                #     orders.append(Order(product, best_bid - 1, -min(best_bid, sell_qty)))
+
 
             result[product] = orders
 
