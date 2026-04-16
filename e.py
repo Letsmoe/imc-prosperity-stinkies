@@ -10,10 +10,14 @@ class Trader:
         self.price_history = {
             "TOMATOES": [],
             "EMERALDS": [],
+            "ASH_COATED_OSMIUM": [],
+            "INTARIAN_PEPPER_ROOT": []
         }
         self.position_limit = {
             "TOMATOES": 80,
             "EMERALDS": 80,
+            "ASH_COATED_OSMIUM": 80,
+            "INTARIAN_PEPPER_ROOT": 80,
         }
 
     # ── helpers ──────────────────────────────────────────────────────────────
@@ -153,6 +157,39 @@ class Trader:
         orders += self.mm("TOMATOES", order_depth, fair_price, position, gamma=0.02, order_amount=20)
         return orders
 
+    def trade_COATED_OSMIUM(self, order_depth, position):
+        raw_mid = self.get_maxamt_mid(order_depth)
+        if raw_mid is None:
+            return []
+        fair_price = round(self.ema_fair_price("ASH_COATED_OSMIUM", raw_mid, span=300))
+        orders, position = self.arb("ASH_COATED_OSMIUM", order_depth, fair_price, position)
+        orders += self.mm("ASH_COATED_OSMIUM", order_depth, fair_price, position, gamma=0.2, order_amount=20)
+        return orders
+
+    def trade_INTARIAN_PEPPER_ROOT(self, order_depth, position, timestamp):
+        orders = []
+        limit = self.position_limit["INTARIAN_PEPPER_ROOT"]
+
+        if timestamp <= 100000 and position < limit:
+            for ask_price in sorted(order_depth.sell_orders):
+                ask_amt = -order_depth.sell_orders[ask_price]
+                buy_amt = min(ask_amt, limit - position)
+                if buy_amt > 0:
+                    orders.append(Order("INTARIAN_PEPPER_ROOT", ask_price, buy_amt))
+                    position += buy_amt
+
+
+        if timestamp >= 9900000 and position > -limit:
+            for bid_price in sorted(order_depth.buy_orders, reverse=True):
+                bid_amt = order_depth.buy_orders[bid_price]
+                sell_amt = min(bid_amt, limit + position)
+                if sell_amt > 0:
+                    orders.append(Order("INTARIAN_PEPPER_ROOT", bid_price, -sell_amt))
+                    position -= sell_amt
+        return orders
+
+
+
     # ── main entry point ──────────────────────────────────────────────────────
 
     def run(self, state: TradingState):
@@ -166,8 +203,12 @@ class Trader:
 
             if product == "EMERALDS":
                 result[product] = self.trade_emeralds(order_depth, position)
-            elif product == "TOMATOES":
+            if product == "TOMATOES":
                 result[product] = self.trade_tomatoes(order_depth, position)
+            if product == "ASH_COATED_OSMIUM":
+                result[product] = self.trade_COATED_OSMIUM(order_depth, position)
+            if product == "INTARIAN_PEPPER_ROOT":
+                result[product] = self.trade_INTARIAN_PEPPER_ROOT(order_depth, position, state.timestamp)
 
         traderData = ""
         conversions = 0
