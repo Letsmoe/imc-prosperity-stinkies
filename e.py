@@ -177,7 +177,7 @@ class Trader:
 
     def trade_COATED_OSMIUM(self, order_depth: OrderDepth, position: int):
         hist = self.price_history["ASH_COATED_OSMIUM"]
-        fair = self.ema_fair_price("ASH_COATED_OSMIUM", 10000, span=2, n=13, s=.55)
+        fair = self.ema_fair_price("ASH_COATED_OSMIUM", 10001, span=3, n=13, s=.53)
 
         orders, position = self.arb("ASH_COATED_OSMIUM", order_depth, fair, position)
         orders += self.mm("ASH_COATED_OSMIUM", order_depth, fair, position,
