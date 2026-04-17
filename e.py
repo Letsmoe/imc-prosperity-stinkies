@@ -66,7 +66,7 @@ class Trader:
 
         return orders, position
 
-    def mm(self, product, order_depth, fair_price, position, gamma=0.1, order_amount=20):
+    def mm(self, product, order_depth, fair_price, position, gamma=0.1, order_amount=20, adj=1):
         limit = self.position_limit[product]
         orders = []
 
@@ -89,8 +89,8 @@ class Trader:
                    + (1 - 2*q)/2 * math.sqrt(sigma**2 * gamma / (2*kappa_a*0.25)
                    * (1 + gamma/kappa_a)**(1 + kappa_a/gamma)))
 
-        p_b = min(round(fair_price - delta_b), fair_price, best_bid + 1)
-        p_a = max(round(fair_price + delta_a), fair_price, best_ask - 1)
+        p_b = min(round(fair_price - delta_b), fair_price, best_bid + adj)
+        p_a = max(round(fair_price + delta_a), fair_price, best_ask - adj)
 
         buy_amt  = min(order_amount, limit - position)
         sell_amt = min(order_amount, limit + position)
@@ -183,6 +183,7 @@ class Trader:
         orders += self.mm("ASH_COATED_OSMIUM", order_depth, fair, position,
                           gamma=0.05,      # small gamma → stay near fair quotes
                           order_amount=20)
+
         return orders
 
     # def trade_INTARIAN_PEPPER_ROOT(self, order_depth, position, timestamp):
@@ -217,10 +218,9 @@ class Trader:
         # Price rises ~1/tick so every delay is a missed gain
         # Sort asks ascending to fill cheapest first
         for ask_price in sorted(order_depth.sell_orders.keys()):
-            if remaining <= 0 or ask_price >= fv + 9:
+            if remaining <= 0 or ask_price >= self.get_pepper_fv(timestamp+100)+1:
                 break
-            available = -order_depth.sell_orders[ask_price]
-            buy_amt = min(available, remaining)
+            buy_amt = min(-order_depth.sell_orders[ask_price], remaining)
             if buy_amt > 0:
                 orders.append(Order("INTARIAN_PEPPER_ROOT", ask_price, buy_amt))
                 remaining -= buy_amt
@@ -238,8 +238,14 @@ class Trader:
         for product, order_depth in state.order_depths.items():
             position = state.position.get(product, 0)
             mid = self.get_mid(order_depth)
-            if mid is not None:
-                self.price_history[product].append(mid)
+
+            if product == "INTARIAN_PEPPER_ROOT":
+                best_ask = min(order_depth.sell_orders) if order_depth.sell_orders else None
+                if best_ask is not None:
+                    self.price_history["INTARIAN_PEPPER_ROOT"].append(best_ask)
+            else:
+                if mid is not None:
+                    self.price_history[product].append(mid)
 
             if product == "EMERALDS":
                 result[product] = self.trade_emeralds(order_depth, position)
