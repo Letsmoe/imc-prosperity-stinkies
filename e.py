@@ -102,16 +102,34 @@ class Trader:
 
         return orders
 
-    def ema_fair_price(self, product, raw_mid, span=50):
+    def ema_fair_price(self, product, raw_mid, span=50, n=200, s=.5):
         hist = self.price_history[product]
-        if len(hist) < 10:
+        if len(hist) < span:
             return raw_mid
-        series = np.array(hist[-200:], dtype=float)
+        series = np.array(hist[-n:], dtype=float)
         alpha = 2 / (span + 1)
         ema = series[0]
         for p in series[1:]:
             ema = alpha * p + (1 - alpha) * ema
-        return 0.45 * raw_mid + 0.55 * ema
+        return round(s * raw_mid + (1-s) * ema)
+
+    def get_pepper_fv(self, timestamp):
+        hist = self.price_history["INTARIAN_PEPPER_ROOT"]
+        n = len(hist)
+
+        if n < 20:
+            # Not enough data yet — just return latest mid
+            return round(hist[-1]) if hist else None
+
+        # Global ticks for each historical observation
+        # Each observation is 1 tick apart (100ms), most recent = current global tick
+        current_global_tick = timestamp // 100
+        ticks = np.arange(current_global_tick - n + 1, current_global_tick + 1)
+
+        prices = np.array(hist, dtype=float)
+        slope, intercept = np.polyfit(ticks, prices, 1)
+        fv = intercept + slope * current_global_tick
+        return round(fv)
 
     # ── per-product strategies ────────────────────────────────────────────────
 
@@ -157,42 +175,64 @@ class Trader:
         orders += self.mm("TOMATOES", order_depth, fair_price, position, gamma=0.02, order_amount=20)
         return orders
 
-    def trade_COATED_OSMIUM(self, order_depth, position):
-        raw_mid = self.get_maxamt_mid(order_depth)
-        if raw_mid is None:
-            return []
-        fair_price = round(self.ema_fair_price("ASH_COATED_OSMIUM", raw_mid, span=300))
-        orders, position = self.arb("ASH_COATED_OSMIUM", order_depth, fair_price, position)
-        orders += self.mm("ASH_COATED_OSMIUM", order_depth, fair_price, position, gamma=0.2, order_amount=20)
+    def trade_COATED_OSMIUM(self, order_depth: OrderDepth, position: int):
+        hist = self.price_history["ASH_COATED_OSMIUM"]
+        fair = self.ema_fair_price("ASH_COATED_OSMIUM", 10000, span=2, n=13, s=.55)
+
+        orders, position = self.arb("ASH_COATED_OSMIUM", order_depth, fair, position)
+        orders += self.mm("ASH_COATED_OSMIUM", order_depth, fair, position,
+                          gamma=0.05,      # small gamma → stay near fair quotes
+                          order_amount=20)
         return orders
+
+    # def trade_INTARIAN_PEPPER_ROOT(self, order_depth, position, timestamp):
+    #     orders = []
+    #     limit = self.position_limit["INTARIAN_PEPPER_ROOT"]
+
+    #     if not order_depth.sell_orders:
+    #         return orders
+
+    #     # BASELINE
+    #     if position < limit:
+    #         best_ask = min(order_depth.sell_orders)
+    #         buy_amt = min(-order_depth.sell_orders[best_ask], limit - position)
+    #         if buy_amt > 0:
+    #             orders.append(Order("INTARIAN_PEPPER_ROOT", best_ask, buy_amt))
+    #             position += buy_amt
+
+    #     return orders
 
     def trade_INTARIAN_PEPPER_ROOT(self, order_depth, position, timestamp):
         orders = []
         limit = self.position_limit["INTARIAN_PEPPER_ROOT"]
 
-        if timestamp <= 100000 and position < limit:
-            for ask_price in sorted(order_depth.sell_orders):
-                ask_amt = -order_depth.sell_orders[ask_price]
-                buy_amt = min(ask_amt, limit - position)
-                if buy_amt > 0:
-                    orders.append(Order("INTARIAN_PEPPER_ROOT", ask_price, buy_amt))
-                    position += buy_amt
+        if position >= limit:
+            return orders
 
+        remaining = limit - position
 
-        if timestamp >= 9900000 and position > -limit:
-            for bid_price in sorted(order_depth.buy_orders, reverse=True):
-                bid_amt = order_depth.buy_orders[bid_price]
-                sell_amt = min(bid_amt, limit + position)
-                if sell_amt > 0:
-                    orders.append(Order("INTARIAN_PEPPER_ROOT", bid_price, -sell_amt))
-                    position -= sell_amt
+        fv = self.get_pepper_fv(timestamp)
+
+        # Sweep ALL ask levels immediately — no timestamp restriction
+        # Price rises ~1/tick so every delay is a missed gain
+        # Sort asks ascending to fill cheapest first
+        for ask_price in sorted(order_depth.sell_orders.keys()):
+            if remaining <= 0 or ask_price >= fv + 9:
+                break
+            available = -order_depth.sell_orders[ask_price]
+            buy_amt = min(available, remaining)
+            if buy_amt > 0:
+                orders.append(Order("INTARIAN_PEPPER_ROOT", ask_price, buy_amt))
+                remaining -= buy_amt
+
         return orders
-
 
 
     # ── main entry point ──────────────────────────────────────────────────────
 
     def run(self, state: TradingState):
+
+        # Trade
         result = {}
 
         for product, order_depth in state.order_depths.items():
