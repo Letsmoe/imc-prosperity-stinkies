@@ -8,7 +8,7 @@ from pathlib import Path
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-DATA_DIR = Path("data/2")
+DATA_DIR = Path("data/3")
 OUT_FILE = Path("market_data.png")
 
 # Timestamp span per day (timestamps run 0–999_900 within a day)
