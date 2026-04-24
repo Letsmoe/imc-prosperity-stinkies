@@ -20,9 +20,6 @@ class Trader:
             "INTARIAN_PEPPER_ROOT": 80,
         }
 
-    def bid(self):
-        return 69
-
     # ── helpers ──────────────────────────────────────────────────────────────
 
     def get_mid(self, order_depth: OrderDepth):
