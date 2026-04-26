@@ -1,34 +1,34 @@
 import json
 import numpy as np
 import math
-from scipy.stats import norm
-from scipy.optimize import brentq
+# from scipy.stats import norm
+# from scipy.optimize import brentq
 from datamodel import OrderDepth, TradingState, Order
 from typing import Any
 
 # ── Black-Scholes helpers ─────────────────────────────────────────────────────
 
-def bs_call(S, K, T, sigma, r=0.0):
-    if sigma <= 0 or T <= 0:
-        return max(S - K, 0.0)
-    d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
-    d2 = d1 - sigma * math.sqrt(T)
-    return S * norm.cdf(d1) - K * math.exp(-r * T) * norm.cdf(d2)
+# def bs_call(S, K, T, sigma, r=0.0):
+#     if sigma <= 0 or T <= 0:
+#         return max(S - K, 0.0)
+#     d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
+#     d2 = d1 - sigma * math.sqrt(T)
+#     return S * norm.cdf(d1) - K * math.exp(-r * T) * norm.cdf(d2)
 
-def bs_delta(S, K, T, sigma, r=0.0):
-    if sigma <= 0 or T <= 0:
-        return 1.0 if S > K else 0.0
-    d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
-    return norm.cdf(d1)
+# def bs_delta(S, K, T, sigma, r=0.0):
+#     if sigma <= 0 or T <= 0:
+#         return 1.0 if S > K else 0.0
+#     d1 = (math.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * math.sqrt(T))
+#     return norm.cdf(d1)
 
-def implied_vol(S, K, T, market_price, r=0.0):
-    intrinsic = max(S - K, 0.0)
-    if market_price <= intrinsic + 1e-6:
-        return None
-    try:
-        return brentq(lambda sig: bs_call(S, K, T, sig, r) - market_price, 1e-6, 10.0)
-    except Exception:
-        return None
+# def implied_vol(S, K, T, market_price, r=0.0):
+#     intrinsic = max(S - K, 0.0)
+#     if market_price <= intrinsic + 1e-6:
+#         return None
+#     try:
+#         return brentq(lambda sig: bs_call(S, K, T, sig, r) - market_price, 1e-6, 10.0)
+#     except Exception:
+#         return None
 
 
 class Trader:
@@ -170,7 +170,7 @@ class Trader:
 
         return orders, position
 
-    def mm(self, product, order_depth, fair_price, position, gamma=0.1, order_amount=20, adj=1):
+    def mm(self, product, order_depth, fair_price, position, gamma=0.1, order_amount=20, adj=1, side=None):
         limit = self.POSITION_LIMIT[product]
         orders = []
 
@@ -183,26 +183,49 @@ class Trader:
         q = position / order_amount
         sigma = 0.5
 
-        kappa_b = 1 / max((fair_price - best_bid) - 1, 1)
-        kappa_a = 1 / max((best_ask - fair_price) - 1, 1)
+        # kappa_b = 1 / max((fair_price - best_bid) - 1, 1)
+        # kappa_a = 1 / max((best_ask - fair_price) - 1, 1)
 
-        delta_b = (1/gamma * math.log(1 + gamma/kappa_b)
-                   + (2*q + 1)/2 * math.sqrt(sigma**2 * gamma / (2*kappa_b*0.25)
-                   * (1 + gamma/kappa_b)**(1 + kappa_b/gamma)))
-        delta_a = (1/gamma * math.log(1 + gamma/kappa_a)
-                   + (1 - 2*q)/2 * math.sqrt(sigma**2 * gamma / (2*kappa_a*0.25)
-                   * (1 + gamma/kappa_a)**(1 + kappa_a/gamma)))
+        # delta_b = (1/gamma * math.log(1 + gamma/kappa_b)
+        #            + (2*q + 1)/2 * math.sqrt(sigma**2 * gamma / (2*kappa_b*0.25)
+        #            * (1 + gamma/kappa_b)**(1 + kappa_b/gamma)))
+        # delta_a = (1/gamma * math.log(1 + gamma/kappa_a)
+        #            + (1 - 2*q)/2 * math.sqrt(sigma**2 * gamma / (2*kappa_a*0.25)
+        #            * (1 + gamma/kappa_a)**(1 + kappa_a/gamma)))
 
-        p_b = min(round(fair_price - delta_b), fair_price, best_bid + adj)
-        p_a = max(round(fair_price + delta_a), fair_price, best_ask - adj)
+        # p_b = min(round(fair_price - delta_b), fair_price, best_bid + adj)
+        # p_a = max(round(fair_price + delta_a), fair_price, best_ask - adj)
 
-        buy_amt  = min(order_amount, limit - position)
-        sell_amt = min(order_amount, limit + position)
+        # buy_amt  = min(order_amount, limit - position)
+        # sell_amt = min(order_amount, limit + position)
 
-        if buy_amt > 0:
-            orders.append(Order(product, int(p_b), buy_amt))
-        if sell_amt > 0:
-            orders.append(Order(product, int(p_a), -sell_amt))
+        # if buy_amt > 0:
+        #     orders.append(Order(product, int(p_b), buy_amt))
+        # if sell_amt > 0:
+        #     orders.append(Order(product, int(p_a), -sell_amt))
+
+        if side is None or side == "bid":
+            kappa_b = 1 / max((fair_price - best_bid) - 1, 1)
+            delta_b = (1/gamma * math.log(1 + gamma/kappa_b)
+                       + (2*q + 1)/2 * math.sqrt(sigma**2 * gamma / (2*kappa_b*0.25)
+                       * (1 + gamma/kappa_b)**(1 + kappa_b/gamma)))
+            # p_b = min(round(fair_price - delta_b), fair_price, best_bid + adj)
+            p_b = min(round(fair_price - delta_b), fair_price, best_bid - 1)  # outside bot A
+            buy_amt = min(order_amount, limit - position)
+            if buy_amt > 0:
+                orders.append(Order(product, int(p_b), buy_amt))
+
+        if side is None or side == "ask":
+            kappa_a = 1 / max((best_ask - fair_price) - 1, 1)
+            delta_a = (1/gamma * math.log(1 + gamma/kappa_a)
+                       + (1 - 2*q)/2 * math.sqrt(sigma**2 * gamma / (2*kappa_a*0.25)
+                       * (1 + gamma/kappa_a)**(1 + kappa_a/gamma)))
+            # p_a = max(round(fair_price + delta_a), fair_price, best_ask - adj)
+            p_a = max(round(fair_price + delta_a), fair_price, best_ask + 1)  # outside bot A
+            sell_amt = min(order_amount, limit + position)
+            if sell_amt > 0:
+                orders.append(Order(product, int(p_a), -sell_amt))
+
 
         return orders
 
@@ -281,89 +304,345 @@ class Trader:
         return orders
 
     def trade_velvetfruit(self, order_depth, position, hist):
-        mid = self.get_mid(order_depth)
+        # mid = self.get_mid(order_depth)
+        mid = self.get_vwap_mid(order_depth)
         if mid is None:
             return []
         fair = self.ema_fair_price(hist, mid, span=50, n=300, s=0.4)
         orders, pos = self.arb("VELVETFRUIT_EXTRACT", order_depth, fair, position)
         orders += self.mm("VELVETFRUIT_EXTRACT", order_depth, fair, pos,
-                          gamma=0.03, order_amount=20, adj=1)
+                          gamma=0.03, order_amount=35, adj=1)
         return orders
 
-    def trade_hydrogel(self, order_depth, position, hist):
-        # mid = self.get_vwap_mid(order_depth)
-        mid = self.get_mid(order_depth)
+    # def trade_hydrogel(self, order_depth, position, hist):
+    #     # mid = self.get_vwap_mid(order_depth)
+    #     mid = self.get_mid(order_depth)
+    #     if mid is None:
+    #         return []
+    #     fair = self.ema_fair_price(hist, mid, span=20, n=100, s=0.39)
+    #     orders, pos = self.arb("HYDROGEL_PACK", order_depth, fair, position)
+    #     orders += self.mm("HYDROGEL_PACK", order_depth, fair, pos,
+    #                       gamma=0.05, order_amount=151, adj=1)
+    #     return orders
+
+    # def trade_hydrogel(self, order_depth, position, hist):
+    #     # mid = self.get_mid(order_depth)
+    #     mid = self.get_vwap_mid(order_depth)
+    #     if mid is None:
+    #         return []
+
+    #     fair = self.ema_fair_price(hist, mid, span=20, n=100, s=0.4)
+
+    #     # sensitivity - 1.0 ~ 3.0
+    #     # Lower catches trends earlier but will false-positive on normal volatility
+    #     # Higher is more conservative
+    #     s = 1.8
+    #     # lookback window - shorter reacts faster, at the cost of more noise
+    #     lw = 10
+
+    #     # trend filter
+    #     if len(hist) >= lw:
+    #         hist_arr = np.array(hist[-lw:])
+    #         trend = mid - hist_arr.mean()
+    #         sigma = hist_arr.std()
+    #         trending = sigma > 0 and abs(trend) > s * sigma
+    #         signed_trend = mid - np.array(hist[-lw:]).mean()
+    #     else:
+    #         trending = False
+
+    #     # orders, pos = [], position
+    #     # if not trending:
+    #     #     orders, pos = self.arb("HYDROGEL_PACK", order_depth, fair, position)
+
+    #     # gamma = 0.12 if trending else 0.05
+    #     # orders += self.mm("HYDROGEL_PACK", order_depth, fair, pos,
+    #     #                   gamma=gamma, order_amount=21, adj=1)
+
+
+    #     # if trending and abs(position) > 100:
+    #     #     # fully stop quoting — wait for passive unwind
+    #     #     pass
+    #     # else:
+    #     #     gamma = 0.12 if trending else 0.05
+    #     #     orders += self.mm("HYDROGEL_PACK", order_depth, fair, pos,
+    #     #                       gamma=gamma, order_amount=21, adj=1)
+
+    #     orders, pos = [], position
+
+    #     if not trending:
+    #         orders, pos = self.arb("HYDROGEL_PACK", order_depth, fair, position)
+    #         orders += self.mm("HYDROGEL_PACK", order_depth, fair, pos,
+    #                           gamma=0.05, order_amount=21, adj=1)
+    #     else:
+    #         down_trend = signed_trend < 0  # mid below recent mean
+
+    #         # if down_trend:
+    #         #     # falling market: only quote ask (unwind longs, don't add)
+    #         #     orders += self.mm("HYDROGEL_PACK", order_depth, fair, pos,
+    #         #         side="ask", gamma=0.12, order_amount=20, adj=1)
+    #         if down_trend and pos > 0:
+    #             # hit bids to unwind longs
+    #             for bid_p in sorted(order_depth.buy_orders, reverse=True):
+    #                 if pos <= 0:
+    #                     break
+    #                 unwind = min(order_depth.buy_orders[bid_p], pos)
+    #                 if unwind > 0:
+    #                     orders.append(Order("HYDROGEL_PACK", bid_p, -unwind))
+    #                     pos -= unwind
+    #         else:
+    #             # rising market: only quote bid (unwind shorts, don't add)
+    #             orders += self.mm("HYDROGEL_PACK", order_depth, fair, pos,
+    #                 side="bid", gamma=0.12, order_amount=20, adj=1)
+    #     return orders
+
+    # ── Intraday drift curve for HYDROGEL_PACK ────────────────────────────────
+    # Fitted from 3-day average of prices_round_3 data.
+    # Baseline ~9991. Price reliably dips −20 to −30 pts in ts 0–550k,
+    # then ramps +20 to +45 pts in ts 600k–950k, settling back near fair by EOD.
+    # Drift values (pts above baseline) sampled every 50k ticks — used to build
+    # the intraday fair-value adjustment at runtime via linear interpolation.
+    _HG_DRIFT_TS    = [     0,  50000, 100000, 150000, 200000, 250000,
+                       300000, 350000, 400000, 450000, 500000, 550000,
+                       600000, 650000, 700000, 750000, 800000, 850000,
+                       900000, 950000, 999900]
+    _HG_DRIFT_VAL   = [  -7.7,  -27.0,  -21.6,   -2.8,  -13.6,  -28.9,
+                        -17.9,   -4.8,  -29.3,  -25.0,   -5.5,   -2.2,
+                         21.7,   17.3,   43.5,   38.1,   16.9,   20.4,
+                         11.4,   17.2,    9.0]
+
+    def _hg_drift(self, timestamp: int) -> float:
+        """Interpolated intraday drift (pts) for HYDROGEL_PACK at this timestamp."""
+        ts_arr  = self._HG_DRIFT_TS
+        val_arr = self._HG_DRIFT_VAL
+        if timestamp <= ts_arr[0]:
+            return val_arr[0]
+        if timestamp >= ts_arr[-1]:
+            return val_arr[-1]
+        for i in range(len(ts_arr) - 1):
+            if ts_arr[i] <= timestamp < ts_arr[i + 1]:
+                frac = (timestamp - ts_arr[i]) / (ts_arr[i + 1] - ts_arr[i])
+                return val_arr[i] + frac * (val_arr[i + 1] - val_arr[i])
+        return 0.0
+
+    def trade_hydrogel(self, order_depth, position, hist, timestamp):
+        """
+        Intraday-drift-aware strategy for HYDROGEL_PACK.
+
+        Fair value = EMA-smoothed mid + intraday drift adjustment.
+
+        Phase logic (driven by the fitted drift curve):
+          • ts 0–550k  (drift < 0, price below baseline):
+              ACCUMULATE — arb aggressively on the ask side; MM skewed long.
+              Target: build up to +LIMIT by ts ~450k.
+          • ts 550k–750k (drift rising fast, +20 to +44):
+              HOLD / passive unwind — stop buying, let position ride the ramp.
+              Only MM on ask side to unwind longs at a premium.
+          • ts 750k–999k (drift fading back toward 0):
+              UNWIND — sell aggressively to close position before EOD.
+        """
+        BASELINE   = 9991.0
+        LIMIT      = self.POSITION_LIMIT["HYDROGEL_PACK"]   # 200
+        orders     = []
+
+        mid = self.get_vwap_mid(order_depth)
         if mid is None:
             return []
-        fair = self.ema_fair_price(hist, mid, span=20, n=100, s=0.39)
-        orders, pos = self.arb("HYDROGEL_PACK", order_depth, fair, position)
-        orders += self.mm("HYDROGEL_PACK", order_depth, fair, pos,
-                          gamma=0.01, order_amount=151, adj=1)
+
+        drift = self._hg_drift(timestamp)
+        # Fair value shifts with the known intraday drift
+        drift_fair = BASELINE + drift
+        # Blend with a short EMA of recent mids for microstructure stability
+        ema_fair = self.ema_fair_price(hist, mid, span=20, n=80, s=0.39)
+        fair = round(0.31 * drift_fair + 0.69 * ema_fair)
+
+        pos = position
+
+        if timestamp < 550_000:
+            # ── Accumulation phase: price is cheap, buy aggressively ──────
+            # Take every ask below fair; post bids to fill limit.
+            buy_cap = LIMIT - pos
+            for ask_p in sorted(order_depth.sell_orders):
+                if buy_cap <= 0:
+                    break
+                if ask_p <= fair:
+                    qty = min(-order_depth.sell_orders[ask_p], buy_cap)
+                    if qty > 0:
+                        orders.append(Order("HYDROGEL_PACK", ask_p, qty))
+                        pos += qty
+                        buy_cap -= qty
+            # Also place a passive resting bid just inside fair
+            if buy_cap > 0 and order_depth.buy_orders:
+                best_bid = max(order_depth.buy_orders)
+                p_bid = min(fair - 1, best_bid + 1)
+                orders.append(Order("HYDROGEL_PACK", int(p_bid), min(30, buy_cap)))
+
+        elif timestamp < 750_000:
+            # ── Hold / passive unwind phase: ride the ramp up ─────────────
+            # Don't add inventory. Sell into strength above fair.
+            sell_cap = LIMIT + pos
+            for bid_p in sorted(order_depth.buy_orders, reverse=True):
+                if sell_cap <= 0:
+                    break
+                if bid_p >= fair + 5:   # only sell when clearly above fair
+                    qty = min(order_depth.buy_orders[bid_p], sell_cap)
+                    if qty > 0:
+                        orders.append(Order("HYDROGEL_PACK", bid_p, -qty))
+                        pos -= qty
+                        sell_cap -= qty
+            # Passive ask just above fair to capture more premium
+            if sell_cap > 0 and order_depth.sell_orders:
+                best_ask = min(order_depth.sell_orders)
+                p_ask = max(fair + 2, best_ask - 1)
+                orders.append(Order("HYDROGEL_PACK", int(p_ask), -min(30, sell_cap)))
+
+        else:
+            # ── Unwind phase: drift fading, flatten before EOD ────────────
+            if pos > 0:
+                # Hit bids to unwind longs; become more aggressive as EOD approaches
+                urgency = (timestamp - 750_000) / (999_900 - 750_000)  # 0→1
+                min_bid = fair - round(urgency * 15)   # accept up to 15 pts slippage at EOD
+                sell_cap = pos
+                for bid_p in sorted(order_depth.buy_orders, reverse=True):
+                    if sell_cap <= 0:
+                        break
+                    if bid_p >= min_bid:
+                        qty = min(order_depth.buy_orders[bid_p], sell_cap)
+                        if qty > 0:
+                            orders.append(Order("HYDROGEL_PACK", bid_p, -qty))
+                            pos -= qty
+                            sell_cap -= qty
+                # Passive ask to catch any remaining bots
+                if sell_cap > 0 and order_depth.sell_orders:
+                    best_ask = min(order_depth.sell_orders)
+                    p_ask = max(fair + 1, best_ask - 1)
+                    orders.append(Order("HYDROGEL_PACK", int(p_ask), -min(40, sell_cap)))
+            elif pos < 0:
+                # Shouldn't normally be short, but cover defensively
+                buy_cap = -pos
+                for ask_p in sorted(order_depth.sell_orders):
+                    if buy_cap <= 0:
+                        break
+                    qty = min(-order_depth.sell_orders[ask_p], buy_cap)
+                    if qty > 0:
+                        orders.append(Order("HYDROGEL_PACK", ask_p, qty))
+                        pos += qty
+                        buy_cap -= qty
+
         return orders
 
-    def trade_vev_options(self, state_order_depths, state_positions, spot, iv_ema, day, timestamp):
-        """IV Scalping across all 10 VEV strikes."""
-        result = {}
-        tte = self.get_tte(day, timestamp)
 
-        for K in self.VEV_STRIKES:
-            product = f"VEV_{K}"
-            order_depth = state_order_depths.get(product)
-            if order_depth is None:
-                continue
+        # mid = self.get_vwap_mid(order_depth)
+        # if mid is None:
+        #     return []
 
-            position = state_positions.get(product, 0)
-            limit    = self.POSITION_LIMIT[product]
-            orders   = []
+        # fair = self.ema_fair_price(hist, mid, span=20, n=100, s=0.4)
 
-            mid = self.get_mid(order_depth)
-            if mid is None:
-                continue
+        # # Deviation from fair in sigma units
+        # lw = 20
+        # if len(hist) >= lw:
+        #     sigma = np.array(hist[-lw:]).std()
+        #     dev_sigmas = abs(mid - fair) / sigma if sigma > 0 else 0
+        # else:
+        #     dev_sigmas = 0
 
-            iv = implied_vol(spot, K, tte, mid)
-            if iv is not None:
-                iv_ema[str(K)] = (0.05 * iv + 0.95 * iv_ema[str(K)])
+        # # Skew MM harder toward fair when price is far from it.
+        # # When mid << fair: AS inventory skew already bids more aggressively (we accumulate
+        # # cheap, expect reversion up). When mid >> fair: skews ask side.
+        # # The order_amount controls how aggressively q = position/order_amount skews quotes —
+        # # shrink it as deviation grows so the skew term amplifies naturally.
+        # base_order_amount = 20
+        # # At 0 sigma: order_amount=20. At 3+ sigma: order_amount=7 (3x more skew).
+        # order_amount = max(7, round(base_order_amount / max(1.0, dev_sigmas)))
 
-            sigma  = iv_ema[str(K)]
-            fair   = bs_call(spot, K, tte, sigma)
-            fair_r = round(fair * 2) / 2
+        # orders, pos = self.arb("HYDROGEL_PACK", order_depth, fair, position)
+        # orders += self.mm("HYDROGEL_PACK", order_depth, fair, pos,
+        #                   gamma=0.05, order_amount=order_amount, adj=1)
 
-            buy_cap  = limit - position
-            sell_cap = limit + position
+        # # Emergency unwind only if very offside AND position is on the wrong side of fair.
+        # # Flipped from before: long + price ABOVE fair = overextended, trim.
+        # #                       short + price BELOW fair = overextended, trim.
+        # UNWIND_THRESHOLD = 3.0
+        # if dev_sigmas > UNWIND_THRESHOLD:
+        #     if position > 0 and mid > fair:
+        #         # Long but price above fair — mean reversion expected downward, trim longs
+        #         for bid_p in sorted(order_depth.buy_orders, reverse=True):
+        #             unwind = min(order_depth.buy_orders[bid_p], pos // 2)
+        #             if unwind > 0:
+        #                 orders.append(Order("HYDROGEL_PACK", bid_p, -unwind))
+        #                 pos -= unwind
+        #     elif position < 0 and mid < fair:
+        #         # Short but price below fair — mean reversion expected upward, trim shorts
+        #         for ask_p in sorted(order_depth.sell_orders):
+        #             unwind = min(-order_depth.sell_orders[ask_p], (-pos) // 2)
+        #             if unwind > 0:
+        #                 orders.append(Order("HYDROGEL_PACK", ask_p, unwind))
+        #                 pos += unwind
 
-            for ask_p in sorted(order_depth.sell_orders):
-                if ask_p >= fair_r or buy_cap <= 0:
-                    break
-                qty = min(-order_depth.sell_orders[ask_p], buy_cap)
-                if qty > 0:
-                    orders.append(Order(product, ask_p, qty))
-                    buy_cap  -= qty
-                    position += qty
+        # return orders
 
-            for bid_p in sorted(order_depth.buy_orders, reverse=True):
-                if bid_p <= fair_r or sell_cap <= 0:
-                    break
-                qty = min(order_depth.buy_orders[bid_p], sell_cap)
-                if qty > 0:
-                    orders.append(Order(product, bid_p, -qty))
-                    sell_cap -= qty
-                    position -= qty
+    # def trade_vev_options(self, state_order_depths, state_positions, spot, iv_ema, day, timestamp):
+    #     """IV Scalping across all 10 VEV strikes."""
+    #     result = {}
+    #     tte = self.get_tte(day, timestamp)
 
-            best_bid = max(order_depth.buy_orders)  if order_depth.buy_orders  else None
-            best_ask = min(order_depth.sell_orders) if order_depth.sell_orders else None
+    #     for K in self.VEV_STRIKES:
+    #         product = f"VEV_{K}"
+    #         order_depth = state_order_depths.get(product)
+    #         if order_depth is None:
+    #             continue
 
-            if best_bid is not None and buy_cap > 0:
-                p_bid = min(int(fair_r) - 1, best_bid + 1)
-                orders.append(Order(product, p_bid, min(15, buy_cap)))
+    #         position = state_positions.get(product, 0)
+    #         limit    = self.POSITION_LIMIT[product]
+    #         orders   = []
 
-            if best_ask is not None and sell_cap > 0:
-                p_ask = max(int(math.ceil(fair_r)) + 1, best_ask - 1)
-                orders.append(Order(product, p_ask, -min(15, sell_cap)))
+    #         mid = self.get_mid(order_depth)
+    #         if mid is None:
+    #             continue
 
-            if orders:
-                result[product] = orders
+    #         iv = implied_vol(spot, K, tte, mid)
+    #         if iv is not None:
+    #             iv_ema[str(K)] = (0.05 * iv + 0.95 * iv_ema[str(K)])
 
-        return result
+    #         sigma  = iv_ema[str(K)]
+    #         fair   = bs_call(spot, K, tte, sigma)
+    #         fair_r = round(fair * 2) / 2
+
+    #         buy_cap  = limit - position
+    #         sell_cap = limit + position
+
+    #         for ask_p in sorted(order_depth.sell_orders):
+    #             if ask_p >= fair_r or buy_cap <= 0:
+    #                 break
+    #             qty = min(-order_depth.sell_orders[ask_p], buy_cap)
+    #             if qty > 0:
+    #                 orders.append(Order(product, ask_p, qty))
+    #                 buy_cap  -= qty
+    #                 position += qty
+
+    #         for bid_p in sorted(order_depth.buy_orders, reverse=True):
+    #             if bid_p <= fair_r or sell_cap <= 0:
+    #                 break
+    #             qty = min(order_depth.buy_orders[bid_p], sell_cap)
+    #             if qty > 0:
+    #                 orders.append(Order(product, bid_p, -qty))
+    #                 sell_cap -= qty
+    #                 position -= qty
+
+    #         best_bid = max(order_depth.buy_orders)  if order_depth.buy_orders  else None
+    #         best_ask = min(order_depth.sell_orders) if order_depth.sell_orders else None
+
+    #         if best_bid is not None and buy_cap > 0:
+    #             p_bid = min(int(fair_r) - 1, best_bid + 1)
+    #             orders.append(Order(product, p_bid, min(15, buy_cap)))
+
+    #         if best_ask is not None and sell_cap > 0:
+    #             p_ask = max(int(math.ceil(fair_r)) + 1, best_ask - 1)
+    #             orders.append(Order(product, p_ask, -min(15, sell_cap)))
+
+    #         if orders:
+    #             result[product] = orders
+
+    #     return result
 
     # ── main entry point ──────────────────────────────────────────────────────
 
@@ -413,7 +692,7 @@ class Trader:
             # elif product == "VELVETFRUIT_EXTRACT":
             #     result[product] = self.trade_velvetfruit(order_depth, position, hist.get("VELVETFRUIT_EXTRACT", []))
             elif product == "HYDROGEL_PACK":
-                result[product] = self.trade_hydrogel(order_depth, position, hist.get("HYDROGEL_PACK", []))
+                result[product] = self.trade_hydrogel(order_depth, position, hist.get("HYDROGEL_PACK", []), state.timestamp)
 
         # if vev_spot is not None:
         #     result.update(self.trade_vev_options(
